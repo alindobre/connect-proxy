@@ -1510,7 +1510,7 @@ getarg( int argc, char **argv )
 {
     int err = 0;
     char *ptr, *server = (char*)NULL;
-    int method = METHOD_DIRECT;
+    int method = METHOD_UNDECIDED;
 
     progname = *argv;
     argc--, argv++;
@@ -1656,8 +1656,6 @@ getarg( int argc, char **argv )
     /* add local addr/mask to direct table automaticaly */
     make_localnet_as_direct();
 #endif
-    
-    set_relay( method, server );
 
     /* check destination HOST (MUST) */
     if ( argc == 0  ) {
@@ -1672,6 +1670,29 @@ getarg( int argc, char **argv )
         ptr++;
     else
         ptr = progname;
+
+    if (method == METHOD_UNDECIDED) {
+      char* dash_ptr=strrchr(ptr, 45); // 45 is the decimal code for dash (-)
+      if (NULL != dash_ptr) {
+        /* Decide method from program name */
+        char *str = strdup(dash_ptr+1);
+        str[strcspn(str, ".")] = '\0';
+        if (strncmp(str, "socks", 5) == 0)
+          method = METHOD_SOCKS;
+        else if (strncmp(str, "http", 4) == 0)
+          method = METHOD_HTTP;
+        else if (strncmp(str, "telnet", 6) == 0)
+          method = METHOD_TELNET;
+        free(str);
+      }
+    }
+
+    /* fallback to METHOD_DIRECT */
+    if (method == METHOD_UNDECIDED)
+      method = METHOD_DIRECT;
+
+    set_relay( method, server );
+
     if ( dest_port == 0 ) {
         /* accept only if -P is not specified. */
         if ( 1 < argc ) {
@@ -1681,7 +1702,7 @@ getarg( int argc, char **argv )
         } else if ( strncmp( ptr, "connect-", 8) == 0 ) {
             /* decide port number from program name */
             char *str = strdup( ptr+8 );
-            str[strcspn( str, "." )] = '\0';
+            str[strcspn( str, ".-" )] = '\0';
             dest_port = resolve_port(str);
             free(str);
         }
